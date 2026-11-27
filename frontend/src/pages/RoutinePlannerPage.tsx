@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Check, Clock, ArrowRight, RefreshCw, AlertCircle, Sun, Cloud, Sunset, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUserStore, useAQIStore, useRecommendationStore } from '../store';
@@ -116,7 +116,7 @@ export default function RoutinePlannerPage() {
     useRecommendationStore();
   const [activeTab, setActiveTab] = useState<TimeOfDay | 'all'>('all');
 
-  const generate = async () => {
+  const generate = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
     try {
@@ -128,13 +128,13 @@ export default function RoutinePlannerPage() {
       setError(msg);
       toast.error('Could not load recommendations');
     }
-  };
+  }, [profile, aqiData, setLoading, setRecommendations, setError]);
 
   useEffect(() => {
     if (profile && recommendations.length === 0) {
       generate();
     }
-  }, []);
+  }, [profile, recommendations.length, generate]);
 
   const filtered = activeTab === 'all'
     ? recommendations

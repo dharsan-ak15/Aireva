@@ -1,7 +1,7 @@
 import { Menu, Bell, RefreshCw } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useUIStore, useAQIStore, useUserStore } from '../../store';
-import { formatRelativeTime, getGreeting } from '../../utils';
+import { formatRelativeTime } from '../../utils';
 
 const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/':            { title: 'Dashboard', subtitle: 'Your air quality overview' },
@@ -18,7 +18,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
 
 export default function TopBar() {
   const { setMobileNavOpen } = useUIStore();
-  const { currentData, lastFetched } = useAQIStore();
+  const lastFetched = useAQIStore((state) => state.lastFetched);
   const profile = useUserStore((s) => s.profile);
   const location = useLocation();
   const page = PAGE_TITLES[location.pathname] ?? { title: 'Aireva' };

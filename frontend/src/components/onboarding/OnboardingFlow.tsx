@@ -4,16 +4,29 @@
 import React, { useState, useCallback } from 'react';
 import {
   Wind,
+  Bot,
+  Leaf,
   MapPin,
   Users,
-  Heart,
+  Briefcase,
+  BookOpen,
+  HeartPulse,
+  HardHat,
+  Handshake,
+  Footprints,
   Bike,
+  CarFront,
+  Car,
+  Bus,
+  CarTaxiFront,
+  Home,
   CheckCircle,
   ChevronRight,
   ChevronLeft,
   Loader2,
   Locate,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type {
   UserCategory,
   CommuteMethod,
@@ -38,23 +51,23 @@ const INDIAN_STATES = [
   'Uttarakhand', 'West Bengal',
 ];
 
-const CATEGORIES: { value: UserCategory; label: string; icon: string; desc: string }[] = [
-  { value: 'family', label: 'Family', icon: '👨‍👩‍👧', desc: 'Managing a household with dependents' },
-  { value: 'working_professional', label: 'Working Professional', icon: '💼', desc: 'Commuting to work daily' },
-  { value: 'student', label: 'Student', icon: '📚', desc: 'School, college or university student' },
-  { value: 'senior_citizen', label: 'Senior Citizen', icon: '🧓', desc: 'Aged 60+ with health considerations' },
-  { value: 'outdoor_worker', label: 'Outdoor Worker', icon: '🏗️', desc: 'Work primarily happens outdoors' },
-  { value: 'community_organizer', label: 'Community Organizer', icon: '🤝', desc: 'Leading local environmental initiatives' },
+const CATEGORIES: { value: UserCategory; label: string; icon: LucideIcon; desc: string }[] = [
+  { value: 'family', label: 'Family', icon: Users, desc: 'Managing a household with dependents' },
+  { value: 'working_professional', label: 'Working Professional', icon: Briefcase, desc: 'Commuting to work daily' },
+  { value: 'student', label: 'Student', icon: BookOpen, desc: 'School, college or university student' },
+  { value: 'senior_citizen', label: 'Senior Citizen', icon: HeartPulse, desc: 'Aged 60+ with health considerations' },
+  { value: 'outdoor_worker', label: 'Outdoor Worker', icon: HardHat, desc: 'Work primarily happens outdoors' },
+  { value: 'community_organizer', label: 'Community Organizer', icon: Handshake, desc: 'Leading local environmental initiatives' },
 ];
 
-const COMMUTE_OPTIONS: { value: CommuteMethod; label: string; icon: string }[] = [
-  { value: 'walking', label: 'Walking', icon: '🚶' },
-  { value: 'cycling', label: 'Cycling', icon: '🚴' },
-  { value: 'motorcycle', label: 'Motorcycle', icon: '🏍️' },
-  { value: 'car', label: 'Car', icon: '🚗' },
-  { value: 'public_transport', label: 'Public Transport', icon: '🚌' },
-  { value: 'auto_rickshaw', label: 'Auto Rickshaw', icon: '🛺' },
-  { value: 'work_from_home', label: 'Work from Home', icon: '🏠' },
+const COMMUTE_OPTIONS: { value: CommuteMethod; label: string; icon: LucideIcon }[] = [
+  { value: 'walking', label: 'Walking', icon: Footprints },
+  { value: 'cycling', label: 'Cycling', icon: Bike },
+  { value: 'motorcycle', label: 'Motorcycle', icon: CarFront },
+  { value: 'car', label: 'Car', icon: Car },
+  { value: 'public_transport', label: 'Public Transport', icon: Bus },
+  { value: 'auto_rickshaw', label: 'Auto Rickshaw', icon: CarTaxiFront },
+  { value: 'work_from_home', label: 'Work from Home', icon: Home },
 ];
 
 const EXERCISE_OPTIONS: { value: ExerciseHabit; label: string }[] = [
@@ -174,19 +187,20 @@ function WelcomeStep({ onNext, form, setForm }: StepProps) {
         </p>
         <p className="text-gray-500 max-w-sm leading-relaxed">
           Aireva gives you real-time air quality data for Indian cities, personalised health
-          recommendations for your household, and actionable steps toward cleaner living — all
-          powered by OpenAQ data and Gemini AI.
+          recommendations for your household, and actionable steps toward cleaner living. Air data
+          uses OpenAQ with an Open-Meteo fallback; AI responses use Gemini when configured and
+          rules-based guidance otherwise.
         </p>
       </div>
       <div className="grid grid-cols-3 gap-4 mb-8 w-full max-w-xs">
         {[
-          { icon: '📊', label: 'Live AQI' },
-          { icon: '🤖', label: 'AI Advice' },
-          { icon: '🌱', label: 'Eco Tips' },
-        ].map((f) => (
-          <div key={f.label} className="flex flex-col items-center bg-gray-50 rounded-2xl p-3">
-            <span className="text-2xl mb-1">{f.icon}</span>
-            <span className="text-xs text-gray-600 font-medium">{f.label}</span>
+          { icon: Wind, label: 'Live AQI' },
+          { icon: Bot, label: 'AI Advice' },
+          { icon: Leaf, label: 'Eco Tips' },
+        ].map(({ icon: FeatureIcon, label }) => (
+          <div key={label} className="flex flex-col items-center bg-gray-50 rounded-2xl p-3">
+            <FeatureIcon className="w-6 h-6 text-forest-700 mb-1" />
+            <span className="text-xs text-gray-600 font-medium">{label}</span>
           </div>
         ))}
       </div>
@@ -223,10 +237,9 @@ function LocationStep({ onNext, onBack, form, setForm, errors }: StepProps) {
     setLocating(true);
     setLocError('');
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      () => {
         setForm((f) => ({
           ...f,
-          // We store coordinates; reverse geocode is best-effort on backend
           city: f.city || 'My Location',
         }));
         setLocating(false);
@@ -336,7 +349,7 @@ function CategoryStep({ onNext, onBack, form, setForm }: StepProps) {
                 : 'border-gray-100 bg-white hover:border-gray-200'
             )}
           >
-            <span className="text-2xl mb-2">{cat.icon}</span>
+            <cat.icon className="w-5 h-5 text-forest-700 mb-2" />
             <span className="text-sm font-semibold text-gray-900">{cat.label}</span>
             <span className="text-xs text-gray-500 mt-0.5">{cat.desc}</span>
           </button>
@@ -367,7 +380,7 @@ function HouseholdStep({ onNext, onBack, form, setForm }: StepProps) {
   return (
     <div className="w-full max-w-sm space-y-4">
       <div className="text-center mb-6">
-        <Heart className="h-10 w-10 text-forest-700 mx-auto mb-2" />
+        <HeartPulse className="h-10 w-10 text-forest-700 mx-auto mb-2" />
         <h2 className="text-2xl font-bold text-gray-900">Your Household</h2>
         <p className="text-sm text-gray-500 mt-1">Help us protect everyone at home.</p>
       </div>
@@ -457,7 +470,7 @@ function LifestyleStep({ onNext, onBack, form, setForm }: StepProps) {
                   : 'border-gray-100 hover:border-gray-200'
               )}
             >
-              <span className="text-xl">{c.icon}</span>
+              <c.icon className="w-5 h-5 text-forest-700" />
               <span className="text-xs text-gray-600 mt-1 text-center leading-tight">{c.label}</span>
             </button>
           ))}
@@ -560,6 +573,7 @@ function LifestyleStep({ onNext, onBack, form, setForm }: StepProps) {
 // ─── STEP: Complete ───────────────────────────────────────────
 function CompleteStep({ form, onFinish, isSubmitting }: { form: FormState; onFinish: () => void; isSubmitting: boolean }) {
   const catInfo = CATEGORIES.find((c) => c.value === form.category);
+  const CategoryIcon = catInfo?.icon;
   return (
     <div className="flex flex-col items-center text-center px-6">
       <div className="h-20 w-20 rounded-full bg-emerald-100 flex items-center justify-center mb-6">
@@ -584,7 +598,10 @@ function CompleteStep({ form, onFinish, isSubmitting }: { form: FormState; onFin
         {catInfo && (
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Category</span>
-            <span className="font-medium text-gray-900">{catInfo.icon} {catInfo.label}</span>
+            <span className="inline-flex items-center gap-1.5 font-medium text-gray-900">
+              {CategoryIcon && <CategoryIcon className="w-4 h-4 text-forest-700" />}
+              {catInfo.label}
+            </span>
           </div>
         )}
         <div className="flex justify-between text-sm">

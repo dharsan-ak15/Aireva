@@ -41,9 +41,9 @@ function mapBackendAQI(raw: any): AQIData {
   const aqiCat = raw.cpcb_category ?? raw.computed_category ?? undefined;
   const aqiSrc =
     raw.cpcb_aqi != null
-      ? raw.cpcb_source || 'CPCB'
+      ? raw.cpcb_source || 'Official CPCB AQI'
       : raw.computed_aqi != null
-      ? 'OpenAQ (CPCB Scale Estimate)'
+      ? 'Estimate using CPCB breakpoints'
       : undefined;
 
   return {
@@ -57,6 +57,7 @@ function mapBackendAQI(raw: any): AQIData {
     aqiValue: aqiVal,
     aqiCategory: aqiCat,
     aqiSource: aqiSrc,
+    isAqiEstimated: raw.cpcb_aqi == null && raw.computed_aqi != null,
     pollutants: (raw.readings ?? []).map((r: any) => ({
       parameter: r.parameter,
       value: r.value,
@@ -78,14 +79,18 @@ function mapFrontendAQIToBackend(aqi: AQIData | null): any {
     country: aqi.country,
     latitude: aqi.latitude,
     longitude: aqi.longitude,
+    cpcb_aqi: aqi.isAqiEstimated ? null : aqi.aqiValue ?? null,
+    cpcb_category: aqi.isAqiEstimated ? null : aqi.aqiCategory ?? null,
+    cpcb_source: aqi.aqiSource ?? 'Official CPCB AQI unavailable',
+    data_provider: aqi.dataProvider,
     readings: aqi.pollutants.map((p) => ({
       parameter: p.parameter,
       value: p.value,
       unit: p.unit,
       last_updated: p.lastUpdated,
     })),
-    computed_aqi: aqi.aqiValue ?? null,
-    computed_category: aqi.aqiCategory ?? null,
+    computed_aqi: aqi.isAqiEstimated ? aqi.aqiValue ?? null : null,
+    computed_category: aqi.isAqiEstimated ? aqi.aqiCategory ?? null : null,
     is_stale: aqi.isStale,
     last_updated: aqi.lastUpdated,
   };
@@ -161,7 +166,7 @@ export async function searchStations(
 export async function fetchHistoricalReadings(
   stationId: string,
   parameter: string,
-  hours = 48
+  hours = 168
 ): Promise<HistoricalReading[]> {
   const { data } = await api.get('/aqi/history', {
     params: { station_id: stationId, parameter, hours },
@@ -231,6 +236,7 @@ export async function askAI(
     alternatives: data.alternatives ?? [],
     limitations: data.limitations ?? [],
     isAIGenerated: Boolean(data.is_ai_generated),
+    modelUsed: data.model_used ?? undefined,
   };
 }
 

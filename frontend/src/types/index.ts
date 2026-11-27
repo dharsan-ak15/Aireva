@@ -28,9 +28,10 @@ export interface AQIData {
   country: string;
   latitude?: number;
   longitude?: number;
-  aqiValue?: number;        // Only when officially validated
+  aqiValue?: number;        // Official AQI or a clearly identified estimate
   aqiCategory?: AQICategory;
-  aqiSource?: string;       // 'CPCB' | 'OpenAQ'
+  aqiSource?: string;
+  isAqiEstimated?: boolean;
   pollutants: PollutantReading[];
   lastUpdated: string;      // ISO timestamp
   dataProvider: string;
@@ -181,6 +182,7 @@ export interface AIResponse {
   alternatives: string[];
   limitations: string[];
   isAIGenerated: boolean;    // false = deterministic fallback
+  modelUsed?: string;
   fallbackReason?: string;
 }
 

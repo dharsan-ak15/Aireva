@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Check, Info, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Check, Info, IndianRupee, RefreshCw } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useUserStore, useIndoorStore } from '../store';
 import { fetchIndoorChecklist } from '../services/api';
 import { cn } from '../utils';
@@ -14,11 +15,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   prevention: 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
-const COST_LABELS: Record<string, string> = {
-  free: '🟢 Free',
-  low: '🟡 Low cost',
-  medium: '🟠 Medium cost',
-  high: '🔴 High cost',
+const COST_LABELS: Record<string, { label: string; icon: LucideIcon; color: string }> = {
+  free: { label: 'Free', icon: Check, color: 'text-emerald-700' },
+  low: { label: 'Low cost', icon: IndianRupee, color: 'text-lime-700' },
+  medium: { label: 'Medium cost', icon: IndianRupee, color: 'text-amber-700' },
+  high: { label: 'High cost', icon: IndianRupee, color: 'text-rose-700' },
 };
 
 const DIFFICULTY_LABELS: Record<string, string> = {
@@ -29,6 +30,8 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 
 function ChecklistCard({ item, onToggle }: { item: IndoorChecklistItem; onToggle: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const cost = COST_LABELS[item.estimatedCost] ?? COST_LABELS.medium;
+  const CostIcon = cost.icon;
 
   return (
     <div className={cn(
@@ -61,7 +64,10 @@ function ChecklistCard({ item, onToggle }: { item: IndoorChecklistItem; onToggle
                 <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium', CATEGORY_COLORS[item.category])}>
                   {item.category}
                 </span>
-                <span className="text-xs text-gray-500">{COST_LABELS[item.estimatedCost]}</span>
+                <span className={cn('inline-flex items-center gap-1 text-xs', cost.color)}>
+                  <CostIcon className="w-3 h-3" />
+                  {cost.label}
+                </span>
                 <span className="text-xs text-gray-500">• {DIFFICULTY_LABELS[item.difficulty]}</span>
               </div>
             </div>
@@ -107,7 +113,7 @@ export default function IndoorAdvisorPage() {
 
   const categories = ['all', 'ventilation', 'purification', 'cleaning', 'cooking', 'prevention'];
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!profile) return;
     setIsLoading(true);
     setError(null);
@@ -121,11 +127,11 @@ export default function IndoorAdvisorPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [profile, setChecklist]);
 
   useEffect(() => {
     if (profile && checklist.length === 0) load();
-  }, []);
+  }, [profile, checklist.length, load]);
 
   const filtered = activeCategory === 'all'
     ? checklist

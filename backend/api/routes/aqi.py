@@ -59,7 +59,7 @@ async def search_stations(
 async def get_historical_readings(
     station_id: str = Query(..., min_length=1),
     parameter: str = Query("pm25", min_length=1, max_length=20),
-    hours: int = Query(48, ge=1, le=168),
+    hours: int = Query(168, ge=1, le=168),
 ):
     """Fetch historical pollutant measurements for a station."""
     return await aqi_service.fetch_historical(

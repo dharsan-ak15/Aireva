@@ -8,6 +8,8 @@ from typing import Optional
 
 from services.openaq_client import OpenAQClient
 from services.open_meteo_client import OpenMeteoClient
+from services.aqi_history_store import get_readings as get_archived_readings
+from services.aqi_history_store import record_readings
 from services.cache import get as cache_get, set as cache_set
 from decision_engine.classifier import calculate_aqi, classify_aqi
 from models.aqi import AQIData, PollutantReading, AQICategoryEnum
@@ -22,6 +24,22 @@ _STALE_HOURS = 2
 
 _client = OpenAQClient()
 _meteo = OpenMeteoClient()
+
+
+def _archive_snapshot(data: AQIDataSchema) -> None:
+    timestamp = data.last_updated or datetime.now(timezone.utc)
+    record_readings(
+        data.station_id,
+        [
+            HistoricalReading(
+                timestamp=reading.last_updated or timestamp,
+                parameter=reading.parameter,
+                value=reading.value,
+                unit=reading.unit,
+            )
+            for reading in data.readings
+        ],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -40,6 +58,7 @@ async def fetch_aqi_for_city(city: str, country: str = "IN") -> Optional[AQIData
     if locations:
         result = await _fetch_for_location(locations[0])
         if result:
+            _archive_snapshot(result)
             cache_set(cache_key, result)
             return result
 
@@ -47,6 +66,7 @@ async def fetch_aqi_for_city(city: str, country: str = "IN") -> Optional[AQIData
     logger.info("OpenAQ unavailable for city=%s; using Open-Meteo Air Quality", city)
     result = await _fetch_open_meteo_for_city(city=city, country=country)
     if result:
+        _archive_snapshot(result)
         cache_set(cache_key, result)
     return result
 
@@ -68,6 +88,7 @@ async def fetch_aqi_for_station(station_id: str) -> Optional[AQIDataSchema]:
     loc = {"id": loc_id, "name": station_id, "locality": "", "country": {"code": "IN"}}
     result = await _fetch_for_location(loc)
     if result:
+        _archive_snapshot(result)
         cache_set(cache_key, result)
     return result
 
@@ -128,47 +149,52 @@ async def fetch_historical(
 ) -> list[HistoricalReading]:
     """Return historical readings for a parameter over *hours* hours."""
     if station_id.startswith("om:"):
-        return await _fetch_open_meteo_history(station_id=station_id, parameter=parameter, hours=hours)
+        readings = await _fetch_open_meteo_history(
+            station_id=station_id, parameter=parameter, hours=hours
+        )
+    else:
+        now = datetime.now(timezone.utc)
+        date_from = (now - timedelta(hours=hours)).isoformat()
+        date_to = now.isoformat()
 
-    now = datetime.now(timezone.utc)
-    date_from = (now - timedelta(hours=hours)).isoformat()
-    date_to = now.isoformat()
-
-    try:
-        loc_id = int(station_id)
-    except ValueError:
-        return []
-
-    raw = await _client.get_location_measurements(
-        location_id=loc_id,
-        parameter=parameter,
-        date_from=date_from,
-        date_to=date_to,
-    )
-    if not raw:
-        return []
-
-    readings: list[HistoricalReading] = []
-    for item in raw:
         try:
-            value = float(item.get("value", 0.0))
-            if not _validate_concentration(parameter, value):
-                continue
-            dt_raw = item.get("period", {}).get("datetimeTo", {}).get("utc") or item.get("date", {}).get("utc")
-            if dt_raw is None:
-                continue
-            readings.append(
-                HistoricalReading(
-                    timestamp=datetime.fromisoformat(dt_raw.replace("Z", "+00:00")),
-                    parameter=parameter,
-                    value=value,
-                    unit=item.get("unit", "µg/m³"),
-                )
-            )
-        except Exception as exc:
-            logger.debug("Skipping bad historical reading: %s", exc)
+            loc_id = int(station_id)
+        except ValueError:
+            readings = []
+        else:
+            raw = await _client.get_location_measurements(
+                location_id=loc_id,
+                parameter=parameter,
+                date_from=date_from,
+                date_to=date_to,
+            ) or []
+            readings = []
+            for item in raw:
+                try:
+                    value = float(item.get("value", 0.0))
+                    if not _validate_concentration(parameter, value):
+                        continue
+                    dt_raw = item.get("period", {}).get("datetimeTo", {}).get("utc") or item.get("date", {}).get("utc")
+                    if dt_raw is None:
+                        continue
+                    readings.append(
+                        HistoricalReading(
+                            timestamp=datetime.fromisoformat(dt_raw.replace("Z", "+00:00")),
+                            parameter=parameter,
+                            value=value,
+                            unit=item.get("unit", "µg/m³"),
+                        )
+                    )
+                except Exception as exc:
+                    logger.debug("Skipping bad historical reading: %s", exc)
 
-    return readings
+    record_readings(station_id, readings)
+    archived = get_archived_readings(station_id, parameter, hours)
+    merged = {
+        reading.timestamp.isoformat(): reading
+        for reading in [*archived, *readings]
+    }
+    return sorted(merged.values(), key=lambda reading: reading.timestamp)
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +211,6 @@ async def _fetch_for_location(loc: dict) -> Optional[AQIDataSchema]:
         return None
 
     readings: list[PollutantReading] = []
-    official_aqi: Optional[int] = None
     latest_dt: Optional[datetime] = None
     reading_dict: dict[str, float] = {}
 
@@ -218,9 +243,8 @@ async def _fetch_for_location(loc: dict) -> Optional[AQIDataSchema]:
             except ValueError:
                 pass
 
-        # If the official AQI parameter is returned, capture it
         if param_name == "aqi":
-            official_aqi = int(value)
+            logger.info("Ignoring AQI value with unverified scale for location=%s", loc_id)
             continue
 
         readings.append(
@@ -244,8 +268,6 @@ async def _fetch_for_location(loc: dict) -> Optional[AQIDataSchema]:
     computed_aqi = calculate_aqi(reading_dict) if reading_dict else None
     computed_category = classify_aqi(computed_aqi) if computed_aqi is not None else None
 
-    official_category = classify_aqi(official_aqi) if official_aqi is not None else None
-
     coords = loc.get("coordinates") or {}
 
     return AQIDataSchema(
@@ -256,9 +278,9 @@ async def _fetch_for_location(loc: dict) -> Optional[AQIDataSchema]:
         latitude=coords.get("latitude"),
         longitude=coords.get("longitude"),
         readings=readings,
-        cpcb_aqi=official_aqi,
-        cpcb_category=official_category,
-        cpcb_source="CPCB (via OpenAQ)",
+        cpcb_aqi=None,
+        cpcb_category=None,
+        cpcb_source="Official CPCB AQI unavailable from OpenAQ",
         computed_aqi=computed_aqi,
         computed_category=computed_category,
         is_stale=is_stale,
@@ -353,7 +375,7 @@ async def _fetch_open_meteo_for_city(city: str, country: str = "IN") -> Optional
         readings=readings,
         cpcb_aqi=None,
         cpcb_category=None,
-        cpcb_source="Not official CPCB AQI",
+        cpcb_source="Official CPCB AQI unavailable from Open-Meteo",
         computed_aqi=computed_aqi,
         computed_category=computed_category,
         is_stale=is_stale,

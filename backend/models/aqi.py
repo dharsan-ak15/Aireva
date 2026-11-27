@@ -43,10 +43,10 @@ class AQIData(BaseModel):
     # Raw pollutant readings from OpenAQ
     readings: list[PollutantReading] = []
 
-    # CPCB AQI – only populated when official AQI parameter is returned by OpenAQ
+    # CPCB AQI – only populated when the provider identifies a verified official value
     cpcb_aqi: Optional[int] = None
     cpcb_category: Optional[AQICategoryEnum] = None
-    cpcb_source: str = "CPCB (via OpenAQ)"
+    cpcb_source: str = "Official CPCB AQI unavailable"
 
     # Computed sub-index AQI from CPCB breakpoints (our own calculation)
     computed_aqi: Optional[int] = None

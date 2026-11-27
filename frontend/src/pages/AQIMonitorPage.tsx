@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw, MapPin, AlertTriangle, Info, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { RefreshCw, MapPin, AlertTriangle, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAQIStore, useUserStore } from '../store';
-import { fetchAQIByCity, fetchHistoricalReadings, searchStations } from '../services/api';
+import { fetchAQIByCity, fetchAQIByStation, fetchHistoricalReadings, searchStations } from '../services/api';
 import { getAQICategoryInfo, getPollutantInfo, getPollutantLevel, formatRelativeTime, formatDateTime, cn } from '../utils';
-import type { AQIData, PollutantReading, HistoricalReading, StationSearchResult } from '../types';
+import type { PollutantReading, HistoricalReading, StationSearchResult } from '../types';
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Legend
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine
 } from 'recharts';
+
+function getCountryCode(country?: string): string {
+  const normalized = (country || 'IN').trim().toUpperCase();
+  return normalized.length <= 3 ? normalized : 'IN';
+}
 
 // ─── AQI Gauge ────────────────────────────────────────────────
 function AQIGauge({ value, category }: { value: number; category: string }) {
@@ -87,7 +92,7 @@ function PollutantCard({ reading }: { reading: PollutantReading }) {
 }
 
 // ─── Trend Chart ──────────────────────────────────────────────
-function TrendChart({ data, parameter }: { data: HistoricalReading[]; parameter: string }) {
+function TrendChart({ data, parameter, source }: { data: HistoricalReading[]; parameter: string; source: string }) {
   const info = getPollutantInfo(parameter);
 
   if (!data.length) {
@@ -98,8 +103,12 @@ function TrendChart({ data, parameter }: { data: HistoricalReading[]; parameter:
     );
   }
 
-  const chartData = data.slice(-48).map((r) => ({
-    time: new Date(r.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+  const chartData = data.map((r) => ({
+    time: new Date(r.timestamp).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+    }),
     value: parseFloat(r.value.toFixed(1)),
   }));
 
@@ -107,7 +116,7 @@ function TrendChart({ data, parameter }: { data: HistoricalReading[]; parameter:
     <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-gray-900">{info.label} Trend (48 hours)</h3>
+          <h3 className="font-semibold text-gray-900">{info.label} Trend (7 days)</h3>
           <p className="text-xs text-gray-500">Historical measurements from monitoring station</p>
         </div>
         <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full border border-gray-200">
@@ -144,8 +153,7 @@ function TrendChart({ data, parameter }: { data: HistoricalReading[]; parameter:
         </LineChart>
       </ResponsiveContainer>
       <p className="text-xs text-gray-400 mt-2">
-        Source: {data[0] ? 'OpenAQ monitoring network' : 'No data'} •
-        These are raw concentration measurements, not official CPCB AQI values.
+        Source: {source}. These are raw concentration measurements, not official CPCB AQI values.
       </p>
     </div>
   );
@@ -162,35 +170,40 @@ export default function AQIMonitorPage() {
   const [historicalData, setHistoricalData] = useState<HistoricalReading[]>([]);
   const [histLoading, setHistLoading] = useState(false);
   const [stationsLoading, setStationsLoading] = useState(false);
+  const initialized = useRef(false);
 
-  const refresh = async (city = cityInput) => {
+  const loadHistory = useCallback(async (stationId: string) => {
+    if (!stationId) return;
+    setHistLoading(true);
+    try {
+      const history = await fetchHistoricalReadings(stationId, 'pm25', 168);
+      setHistoricalData(history);
+    } catch {
+      setHistoricalData([]);
+    } finally {
+      setHistLoading(false);
+    }
+  }, []);
+
+  const refresh = useCallback(async (city: string) => {
     if (!city.trim()) return;
     setLoading(true);
     try {
-      const data = await fetchAQIByCity(city, profile?.location?.country || 'IN');
+      const data = await fetchAQIByCity(city, getCountryCode(profile?.location?.country));
       setAQIData(data);
-
-      // Also fetch historical for PM2.5
-      if (data.stationId) {
-        setHistLoading(true);
-        try {
-          const hist = await fetchHistoricalReadings(data.stationId, 'pm25', 48);
-          setHistoricalData(hist);
-        } catch { /* historical data optional */ }
-        finally { setHistLoading(false); }
-      }
+      await loadHistory(data.stationId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch AQI data';
       setError(msg);
       toast.error(msg);
     }
-  };
+  }, [profile?.location?.country, setAQIData, setError, setLoading, loadHistory]);
 
   const searchForStations = async () => {
     if (!cityInput.trim()) return;
     setStationsLoading(true);
     try {
-      const results = await searchStations(cityInput, profile?.location?.country || 'IN');
+      const results = await searchStations(cityInput, getCountryCode(profile?.location?.country));
       setStations(results);
     } catch {
       toast.error('Could not search stations');
@@ -199,15 +212,36 @@ export default function AQIMonitorPage() {
     }
   };
 
-  useEffect(() => {
-    if (profile?.location?.city && !currentData) {
-      refresh(profile.location.city);
+  const selectStation = async (stationId: string) => {
+    setSelectedStation(stationId);
+    if (!stationId) return;
+    setLoading(true);
+    try {
+      const data = stationId.startsWith('om:')
+        ? await fetchAQIByCity(cityInput, getCountryCode(profile?.location?.country))
+        : await fetchAQIByStation(stationId);
+      setAQIData(data);
+      await loadHistory(data.stationId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch station data';
+      setError(msg);
+      toast.error(msg);
     }
-  }, []);
+  };
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    if (profile?.location?.city && !currentData) {
+      void refresh(profile.location.city);
+    } else if (currentData?.stationId) {
+      void loadHistory(currentData.stationId);
+    }
+  }, [currentData, profile?.location?.city, loadHistory, refresh]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    refresh();
+    refresh(cityInput);
     searchForStations();
   };
 
@@ -230,8 +264,8 @@ export default function AQIMonitorPage() {
               className="input-field pl-9"
             />
           </div>
-          <button type="submit" disabled={isLoading || !cityInput.trim()} className="btn-primary">
-            {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Search'}
+          <button type="submit" disabled={isLoading || stationsLoading || !cityInput.trim()} className="btn-primary">
+            {isLoading || stationsLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Search'}
           </button>
         </form>
 
@@ -243,7 +277,7 @@ export default function AQIMonitorPage() {
             <select
               className="select-field text-sm"
               value={selectedStation}
-              onChange={(e) => setSelectedStation(e.target.value)}
+              onChange={(e) => selectStation(e.target.value)}
             >
               <option value="">Select a station (optional)</option>
               {stations.map((s) => (
@@ -261,7 +295,7 @@ export default function AQIMonitorPage() {
       <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
         <Info className="w-4 h-4 shrink-0 mt-0.5" />
         <span>
-          Data is sourced from <strong>OpenAQ</strong> monitoring stations. These are raw concentration
+          Data source: <strong>{currentData?.dataProvider || 'OpenAQ / Open-Meteo'}</strong>. These are raw concentration
           measurements. Official CPCB AQI values are only displayed when available from the CPCB data feed.
           Never interpret OpenAQ concentration values directly as CPCB AQI.
         </span>
@@ -281,7 +315,7 @@ export default function AQIMonitorPage() {
           <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
           <p className="font-medium text-gray-900 mb-1">Data Unavailable</p>
           <p className="text-sm text-gray-500 mb-4">{error}</p>
-          <button onClick={() => refresh()} className="btn-primary">
+          <button onClick={() => refresh(cityInput)} className="btn-primary">
             <RefreshCw className="w-4 h-4 mr-2" /> Retry
           </button>
         </div>
@@ -295,10 +329,17 @@ export default function AQIMonitorPage() {
             {/* AQI Gauge */}
             <div className="card p-6 md:col-span-1">
               {currentData.aqiValue !== undefined ? (
-                <AQIGauge
-                  value={currentData.aqiValue}
-                  category={currentData.aqiCategory || 'unknown'}
-                />
+                <>
+                  <AQIGauge
+                    value={currentData.aqiValue}
+                    category={currentData.aqiCategory || 'unknown'}
+                  />
+                  {currentData.isAqiEstimated && (
+                    <p className="mt-2 text-xs text-center text-amber-700">
+                      Estimate from pollutant readings using CPCB breakpoints; not an official CPCB reading.
+                    </p>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-4">
                   <p className="text-sm text-gray-500 mb-2">Official AQI not available</p>
@@ -315,7 +356,7 @@ export default function AQIMonitorPage() {
               <div className="mt-4 pt-4 border-t border-gray-100 space-y-1 text-xs text-gray-500">
                 {currentData.aqiSource && (
                   <div className="flex justify-between">
-                    <span>AQI Source</span>
+                    <span>AQI Method</span>
                     <span className="font-medium text-gray-700">{currentData.aqiSource}</span>
                   </div>
                 )}
@@ -338,7 +379,7 @@ export default function AQIMonitorPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => refresh()}
+                  onClick={() => refresh(cityInput)}
                   className="btn-ghost p-2 rounded-lg"
                   aria-label="Refresh"
                 >
@@ -405,7 +446,7 @@ export default function AQIMonitorPage() {
                 <RefreshCw className="w-6 h-6 text-forest-400 animate-spin mx-auto" />
               </div>
             ) : (
-              <TrendChart data={historicalData} parameter="pm25" />
+              <TrendChart data={historicalData} parameter="pm25" source={currentData.dataProvider} />
             )}
           </div>
         </>

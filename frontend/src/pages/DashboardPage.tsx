@@ -4,7 +4,7 @@ import {
   Wind, CalendarDays, Bot, ArrowRight, RefreshCw,
   MapPin, Lightbulb, CheckCircle2, AlertCircle
 } from 'lucide-react';
-import { useUserStore, useAQIStore, useRecommendationStore, useProgressStore } from '../store';
+import { useUserStore, useRecommendationStore, useProgressStore } from '../store';
 import { useAQI } from '../hooks/useAQI';
 import { useRecommendations } from '../hooks/useRecommendations';
 import AQICard from '../components/aqi/AQICard';

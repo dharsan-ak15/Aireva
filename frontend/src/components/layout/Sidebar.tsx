@@ -2,27 +2,27 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Home, Wind, CalendarDays, Building2, Leaf, Bot,
   FlaskConical, TrendingUp, Users, UserCircle,
-  ChevronLeft, ChevronRight, Menu, X
+  ChevronLeft, ChevronRight, X
 } from 'lucide-react';
 import { useUIStore } from '../../store';
 import { cn } from '../../utils';
 
 const NAV_ITEMS = [
-  { id: 'home',       path: '/',           label: 'Dashboard',         icon: Home,          desc: 'Overview & quick actions' },
-  { id: 'aqi',        path: '/aqi',         label: 'Live AQI',          icon: Wind,          desc: 'Real-time air quality data' },
-  { id: 'routine',    path: '/routine',     label: 'Daily Routine',     icon: CalendarDays,  desc: 'Personalized day planner' },
-  { id: 'indoor',     path: '/indoor',      label: 'Indoor Advisor',    icon: Building2,     desc: 'Indoor air quality guide' },
-  { id: 'sustainable',path: '/sustainable', label: 'Sustainable Choices',icon: Leaf,         desc: 'Eco-friendly alternatives' },
-  { id: 'ai',         path: '/ai',          label: 'Aireva AI',         icon: Bot,           desc: 'AI-powered assistant' },
-  { id: 'simulator',  path: '/simulator',   label: 'What-If Simulator', icon: FlaskConical,  desc: 'Compare lifestyle routines' },
-  { id: 'progress',   path: '/progress',    label: 'My Progress',       icon: TrendingUp,    desc: 'Track clean air habits' },
-  { id: 'community',  path: '/community',   label: 'Community',         icon: Users,         desc: 'Community awareness' },
-  { id: 'profile',    path: '/profile',     label: 'Profile',           icon: UserCircle,    desc: 'Settings & preferences' },
+  { id: 'home',        path: '/',            label: 'Dashboard',          icon: Home },
+  { id: 'aqi',         path: '/aqi',         label: 'Live AQI',           icon: Wind },
+  { id: 'routine',     path: '/routine',     label: 'Daily Routine',      icon: CalendarDays },
+  { id: 'indoor',      path: '/indoor',      label: 'Indoor Advisor',     icon: Building2 },
+  { id: 'sustainable', path: '/sustainable', label: 'Sustainable Choices', icon: Leaf },
+  { id: 'ai',          path: '/ai',          label: 'Aireva AI',          icon: Bot },
+  { id: 'simulator',   path: '/simulator',   label: 'What-If Simulator',  icon: FlaskConical },
+  { id: 'progress',    path: '/progress',    label: 'My Progress',        icon: TrendingUp },
+  { id: 'community',   path: '/community',   label: 'Community',          icon: Users },
+  { id: 'profile',     path: '/profile',     label: 'Profile',            icon: UserCircle },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
-  const { sidebarOpen, setSidebarOpen, toggleSidebar, mobileNavOpen, setMobileNavOpen } =
+  const { sidebarOpen, toggleSidebar, mobileNavOpen, setMobileNavOpen } =
     useUIStore();
 
   const isActive = (path: string) =>
@@ -85,7 +85,7 @@ export default function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide">
           <ul className="space-y-0.5">
-            {NAV_ITEMS.map(({ id, path, label, icon: Icon, desc }) => {
+            {NAV_ITEMS.map(({ id, path, label, icon: Icon }) => {
               const active = isActive(path);
               return (
                 <li key={id}>

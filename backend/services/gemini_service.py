@@ -127,12 +127,16 @@ class GeminiService:
         except Exception as exc:
             logger.debug("Fallback rules generation error: %s", exc)
 
-        aqi_context = (
-            f"Air quality category: {aqi_category.value if aqi_category else 'unknown'}. "
-            "Values are OpenAQ measurements – not official CPCB AQI."
-            if aqi_data
-            else "No live AQI data available."
-        )
+        if aqi and aqi.cpcb_aqi is not None:
+            aqi_context = f"Official CPCB AQI: {aqi.cpcb_aqi}. Source: {aqi.cpcb_source}."
+        elif aqi_data:
+            aqi_context = (
+                f"Estimated AQI category: {aqi_category.value if aqi_category else 'unknown'}. "
+                f"Calculated using CPCB breakpoints from {aqi_data.get('data_provider', 'reported')} "
+                "pollutant concentrations. This is not an official CPCB AQI reading."
+            )
+        else:
+            aqi_context = "No live AQI data available."
 
         return AIResponse(
             summary=(

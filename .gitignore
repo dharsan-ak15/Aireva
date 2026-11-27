@@ -1,0 +1,14 @@
+.venv/
+**/.venv/
+**/venv/
+**/node_modules/
+**/dist/
+**/__pycache__/
+*.py[cod]
+*.sqlite3
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+.DS_Store
+Thumbs.db

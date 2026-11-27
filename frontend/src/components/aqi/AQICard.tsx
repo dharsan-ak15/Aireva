@@ -181,6 +181,11 @@ export default function AQICard({ data, isLoading, error, onRefresh }: AQICardPr
             >
               {info.label}
             </span>
+            {data.isAqiEstimated && (
+              <p className="mt-2 text-xs text-amber-700 text-center">
+                Estimated from pollutant readings using CPCB breakpoints; not an official CPCB reading.
+              </p>
+            )}
             <p className="mt-2 text-xs text-gray-500 text-center max-w-xs">{info.description}</p>
           </>
         ) : (

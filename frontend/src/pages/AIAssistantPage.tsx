@@ -45,8 +45,12 @@ function AIMessageCard({ aiResponse }: { aiResponse: AIResponse }) {
       {!aiResponse.isAIGenerated && (
         <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>Using rule-based recommendations (AI service temporarily unavailable)</span>
+          <span>Deterministic fallback: Gemini is unavailable or not configured.</span>
         </div>
+      )}
+
+      {aiResponse.isAIGenerated && aiResponse.modelUsed && (
+        <p className="text-xs text-gray-400">Generated with {aiResponse.modelUsed}</p>
       )}
 
       <p className="text-sm text-gray-800 leading-relaxed">{aiResponse.summary}</p>
@@ -175,17 +179,7 @@ export default function AIAssistantPage() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: '',
-      aiResponse: {
-        summary: `Hello${profile?.name ? `, ${profile.name}` : ''}! I'm Aireva AI, your personal air quality assistant. I can help you understand your local air quality, plan your day safely, and make healthier lifestyle choices. What would you like to know?`,
-        air_quality_context: aqiData
-          ? `I have access to current air quality data for ${aqiData.city} from ${aqiData.dataProvider}.`
-          : 'Air quality data is not currently loaded. I\'ll provide general guidance, but for location-specific advice, please fetch your city\'s data from the Live AQI page.',
-        recommendations: [],
-        alternatives: [],
-        limitations: ['I am not a medical professional. For health concerns, consult a doctor.'],
-        isAIGenerated: true,
-      },
+      content: `Hello${profile?.name ? `, ${profile.name}` : ''}! I'm Aireva AI, your air quality assistant. I can help explain your local air quality, plan your day, and suggest healthier choices. What would you like to know?`,
       timestamp: new Date(),
     },
   ]);
@@ -265,15 +259,7 @@ export default function AIAssistantPage() {
       {
         id: 'welcome_new',
         role: 'assistant',
-        content: '',
-        aiResponse: {
-          summary: 'Chat cleared. How can I help you today?',
-          air_quality_context: '',
-          recommendations: [],
-          alternatives: [],
-          limitations: [],
-          isAIGenerated: true,
-        },
+        content: 'Chat cleared. How can I help you today?',
         timestamp: new Date(),
       },
     ]);
@@ -289,7 +275,7 @@ export default function AIAssistantPage() {
           </div>
           <div>
             <h2 className="font-semibold text-gray-900">Aireva AI Assistant</h2>
-            <p className="text-xs text-gray-500">Powered by Google Gemini</p>
+            <p className="text-xs text-gray-500">Gemini 2.0 Flash with deterministic fallback</p>
           </div>
         </div>
         <button onClick={clearChat} className="btn-ghost text-xs flex items-center gap-1">

@@ -59,7 +59,7 @@ export const useAQIStore = create<AQIStore>()((set) => ({
   error: null,
   lastFetched: null,
   setAQIData: (data) =>
-    set({ currentData: data, error: null, lastFetched: new Date().toISOString() }),
+    set({ currentData: data, isLoading: false, error: null, lastFetched: new Date().toISOString() }),
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error, isLoading: false }),
   clearData: () => set({ currentData: null, error: null, lastFetched: null }),
